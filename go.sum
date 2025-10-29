@@ -53,8 +53,8 @@ github.com/containerd/imgcrypt/v2 v2.0.1 h1:gQcmeCKA97fAl0wlpq0itSY/PagFBsn4/mlK
 github.com/containerd/imgcrypt/v2 v2.0.1/go.mod h1:/qIJL8nxzdzMA2n5iYyyuIY36KfoVQWmgTWdfVtyebM=
 github.com/containerd/log v0.1.0 h1:TCJt7ioM2cr/tfR8GPbGf9/VRAX8D2B4PjzCpfX540I=
 github.com/containerd/log v0.1.0/go.mod h1:VRRf09a7mHDIRezVKTRCrOq78v577GXq3bSa3EhrzVo=
-github.com/containerd/nerdctl/v2 v2.1.4 h1:i+xTC6tA9AVTx8mP36alP7MTNgAUQE4Prqji8LqNXsw=
-github.com/containerd/nerdctl/v2 v2.1.4/go.mod h1:JZaaL+Lbl40yoQoggk7CWjHmB/z7cJBsrBWO9CL1FrE=
+github.com/containerd/nerdctl/v2 v2.1.6 h1:TTaJ+f58PA/CkjeKzRdXisg5+7KJQeiq4xd3ma4bhRg=
+github.com/containerd/nerdctl/v2 v2.1.6/go.mod h1:XBIa8yzX2BddwiJtN47w4w4Xmki/Y6w8HHd5DfkjzlA=
 github.com/containerd/platforms v1.0.0-rc.1 h1:83KIq4yy1erSRgOVHNk1HYdPvzdJ5CnsWaRoJX4C41E=
 github.com/containerd/platforms v1.0.0-rc.1/go.mod h1:J71L7B+aiM5SdIEqmd9wp6THLVRzJGXfNuWCZCllLA4=
 github.com/containerd/plugin v1.0.0 h1:c8Kf1TNl6+e2TtMHZt+39yAPDbouRH9WAToRjex483Y=
@@ -290,8 +290,8 @@ github.com/rogpeppe/go-internal v1.13.1 h1:KvO1DLK/DRN07sQ1LQKScxyZJuNnedQ5/wKSR
 github.com/rogpeppe/go-internal v1.13.1/go.mod h1:uMEvuHeurkdAXX61udpOXGD/AzZDWNMNyH2VO9fmH0o=
 github.com/rootless-containers/rootlesskit/v2 v2.3.5 h1:WGY05oHE7xQpSkCGfYP9lMY5z19tCxA8PhWlvP1cKx8=
 github.com/rootless-containers/rootlesskit/v2 v2.3.5/go.mod h1:83EIYLeMX8UeNgLHkR1PefoSV76aKEC+OyI3vzrEfvw=
-github.com/runfinch/common-tests v0.9.4 h1:ctGR/jq4eP3KbdeSfL4ya7DNafwc9+sQgyRdkocfMh8=
-github.com/runfinch/common-tests v0.9.4/go.mod h1:25UdRwKrGWnIzKHvceDaMpV3rz+41aCXGB1AOX768po=
+github.com/runfinch/common-tests v0.10.0 h1:EqZRX8iPmAvmr9k1c/JqqyZkeLCp+rwKgGGdVhSQGR0=
+github.com/runfinch/common-tests v0.10.0/go.mod h1:PX9VBgtcOm+2Stjm4F6Y6KpovJ2emdSJ+y1X1URnAIU=
 github.com/russross/blackfriday/v2 v2.1.0 h1:JIOH55/0cWyOuilr9/qlrm0BSXldqnqwMsf35Ld67mk=
 github.com/russross/blackfriday/v2 v2.1.0/go.mod h1:+Rmxgy9KzJVeS9/2gXHxylqXiyQDYRxCVz55jmeOWTM=
 github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06 h1:OkMGxebDjyw0ULyrTYWeN0UNCCkmCWfjPnIA2W6oviI=

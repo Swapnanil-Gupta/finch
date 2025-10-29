@@ -5,7 +5,7 @@ go 1.24.6
 require (
 	github.com/aws/aws-sdk-go-v2 v1.39.0
 	github.com/containerd/cgroups v1.1.0
-	github.com/containerd/nerdctl/v2 v2.1.4
+	github.com/containerd/nerdctl/v2 v2.1.6
 	github.com/docker/cli v28.4.0+incompatible
 	github.com/docker/docker v28.4.0+incompatible
 	github.com/docker/go-connections v0.6.0
@@ -15,7 +15,7 @@ require (
 	github.com/onsi/gomega v1.38.2
 	github.com/pelletier/go-toml v1.9.5
 	github.com/pkg/sftp v1.13.9
-	github.com/runfinch/common-tests v0.9.4
+	github.com/runfinch/common-tests v0.10.0
 	github.com/shirou/gopsutil/v3 v3.24.5
 	github.com/sirupsen/logrus v1.9.4-0.20230606125235-dd1b4c2e81af
 	github.com/spf13/afero v1.15.0
