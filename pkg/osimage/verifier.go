@@ -8,11 +8,7 @@ package osimage
 import (
 	"bytes"
 	"crypto"
-	"crypto/rsa"
-	"crypto/sha256"
-	"crypto/x509"
 	"encoding/hex"
-	"encoding/pem"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -26,62 +22,98 @@ import (
 )
 
 const (
-	issuer   = "https://token.actions.githubusercontent.com"
-	identity = "https://github.com/Swapnanil-Gupta/finch-core/.github/workflows/test-keyless-signing.yaml@refs/heads/main"
+	CosignIssuer = "https://token.actions.githubusercontent.com"
+	// TODO: change this to actual values from runfinch/finch-core
+	CosignIdentity = "https://github.com/Swapnanil-Gupta/finch-core/.github/workflows/test-keyless-signing.yaml@refs/heads/main"
 )
 
-func verifySignatureWithCosign(dataBytes, signatureBytes []byte) error {
-	trustedRoot, err := root.FetchTrustedRoot()
+// ManifestVerifier verifies the integrity and authenticity of a manifest.
+type ManifestVerifier interface {
+	Verify(data, signature []byte) error
+}
+
+// TrustedRootProvider abstracts where the Sigstore trusted root comes from.
+type TrustedRootProvider interface {
+	FetchTrustedRoot() (*root.TrustedRoot, error)
+}
+
+// DefaultTrustedRootProvider fetches the trusted root from Sigstore's TUF repository.
+type DefaultTrustedRootProvider struct{}
+
+func (DefaultTrustedRootProvider) FetchTrustedRoot() (*root.TrustedRoot, error) {
+	return root.FetchTrustedRoot()
+}
+
+var DefaultVerifierOptions = []verify.VerifierOption{
+	verify.WithSignedCertificateTimestamps(1),
+	verify.WithIntegratedTimestamps(1),
+	verify.WithSignedTimestamps(1),
+	verify.WithTransparencyLog(1),
+}
+
+// CosignVerifier verifies manifest signatures using Sigstore/cosign.
+type CosignVerifier struct {
+	rootProvider    TrustedRootProvider
+	issuer          string
+	identity        string
+	verifierOptions []verify.VerifierOption
+}
+
+func NewCosignVerifier(rootProvider TrustedRootProvider, issuer, identity string, opts []verify.VerifierOption) *CosignVerifier {
+	return &CosignVerifier{
+		rootProvider:    rootProvider,
+		issuer:          issuer,
+		identity:        identity,
+		verifierOptions: opts,
+	}
+}
+
+func (v *CosignVerifier) Verify(data, bundleBytes []byte) error {
+	trustedRoot, err := v.rootProvider.FetchTrustedRoot()
 	if err != nil {
-		return fmt.Errorf("failed to fetch trusted root: %w\n", err)
+		return fmt.Errorf("failed to fetch trusted root: %w", err)
 	}
 
-	verifier, err := verify.NewVerifier(trustedRoot,
-		verify.WithSignedCertificateTimestamps(1),
-		verify.WithIntegratedTimestamps(1),
-		verify.WithSignedTimestamps(1),
-		verify.WithTransparencyLog(1),
-	)
+	verifier, err := verify.NewVerifier(trustedRoot, v.verifierOptions...)
 	if err != nil {
-		return fmt.Errorf("failed to create verifier: %w\n", err)
+		return fmt.Errorf("failed to create verifier: %w", err)
 	}
 
-	certID, err := verify.NewShortCertificateIdentity(issuer, "", identity, "")
+	certID, err := verify.NewShortCertificateIdentity(v.issuer, "", v.identity, "")
 	if err != nil {
-		return fmt.Errorf("failed to create certificate identity: %w\n", err)
+		return fmt.Errorf("failed to create certificate identity: %w", err)
 	}
 
 	policy := verify.NewPolicy(
-		verify.WithArtifact(bytes.NewReader(dataBytes)),
+		verify.WithArtifact(bytes.NewReader(data)),
 		verify.WithCertificateIdentity(certID),
 	)
 
 	var sigBundle bundle.Bundle
-	err = sigBundle.UnmarshalJSON(signatureBytes)
-	if err != nil {
-		return fmt.Errorf("failed to load signature bundle: %w\n", err)
+	if err := sigBundle.UnmarshalJSON(bundleBytes); err != nil {
+		return fmt.Errorf("failed to load signature bundle: %w", err)
 	}
 
-	_, err = verifier.Verify(&sigBundle, policy)
-	if err != nil {
-		return fmt.Errorf("failed to verify signature: %w\n", err)
-	}
-	return nil
-}
-
-func verifySignatureWithPublicKey(dataBytes, signatureBytes, pubKeyBytes []byte) error {
-	hashedData := sha256.Sum256(dataBytes)
-	pubKey, err := getRsaPublicKeyFromBytes(pubKeyBytes)
-	if err != nil {
-		return fmt.Errorf("failed to parse public key: %w", err)
-	}
-
-	if err := rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, hashedData[:], signatureBytes); err != nil {
+	if _, err := verifier.Verify(&sigBundle, policy); err != nil {
 		return fmt.Errorf("failed to verify signature: %w", err)
 	}
 	return nil
 }
 
+// func verifySignatureWithPublicKey(dataBytes, signatureBytes, pubKeyBytes []byte) error {
+// 	hashedData := sha256.Sum256(dataBytes)
+// 	pubKey, err := getRsaPublicKeyFromBytes(pubKeyBytes)
+// 	if err != nil {
+// 		return fmt.Errorf("failed to parse public key: %w", err)
+// 	}
+
+// 	if err := rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, hashedData[:], signatureBytes); err != nil {
+// 		return fmt.Errorf("failed to verify signature: %w", err)
+// 	}
+// 	return nil
+// }
+
+// TODO: change expectedDigest to byte[]
 func verifyDigest(reader io.Reader, expectedDigest string, hash crypto.Hash) error {
 	hasher := hash.New()
 	if _, err := io.Copy(hasher, reader); err != nil {
@@ -114,7 +146,6 @@ func verifyImageIsNewer(newImage, currentImage string) (bool, error) {
 	return newRunID > currentRunID, nil
 }
 
-// TODO: move to utils
 func extractGHRunID(filename string) (int64, error) {
 	name := strings.TrimSuffix(filename, filepath.Ext(filename))
 	parts := strings.Split(name, "-")
@@ -128,15 +159,15 @@ func extractGHRunID(filename string) (int64, error) {
 	return runID, nil
 }
 
-func getRsaPublicKeyFromBytes(pubKeyBytes []byte) (*rsa.PublicKey, error) {
-	block, _ := pem.Decode(pubKeyBytes)
-	pub, err := x509.ParsePKIXPublicKey(block.Bytes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse public key")
-	}
-	rsaPub, ok := pub.(*rsa.PublicKey)
-	if !ok {
-		return nil, fmt.Errorf("failed to parse public key")
-	}
-	return rsaPub, nil
-}
+// func getRsaPublicKeyFromBytes(pubKeyBytes []byte) (*rsa.PublicKey, error) {
+// 	block, _ := pem.Decode(pubKeyBytes)
+// 	pub, err := x509.ParsePKIXPublicKey(block.Bytes)
+// 	if err != nil {
+// 		return nil, fmt.Errorf("failed to parse public key")
+// 	}
+// 	rsaPub, ok := pub.(*rsa.PublicKey)
+// 	if !ok {
+// 		return nil, fmt.Errorf("failed to parse public key")
+// 	}
+// 	return rsaPub, nil
+// }

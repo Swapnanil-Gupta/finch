@@ -23,6 +23,8 @@ type osImageUpdateAction struct {
 	fp            path.Finch
 	fc            *config.Finch
 	finchRootPath string
+	baseURL       string
+	verifier      osimage.ManifestVerifier
 	checkOnly     bool
 }
 
@@ -38,7 +40,19 @@ func newOSImageUpdateCommand(logger flog.Logger, fp path.Finch, fc *config.Finch
 }
 
 func newOSImageUpdateAction(logger flog.Logger, fp path.Finch, fc *config.Finch, finchRootPath string) *osImageUpdateAction {
-	return &osImageUpdateAction{logger: logger, fp: fp, fc: fc, finchRootPath: finchRootPath}
+	return &osImageUpdateAction{
+		logger:        logger,
+		fp:            fp,
+		fc:            fc,
+		finchRootPath: finchRootPath,
+		baseURL:       osimage.FinchDepsURL,
+		verifier: osimage.NewCosignVerifier(
+			osimage.DefaultTrustedRootProvider{},
+			osimage.CosignIssuer,
+			osimage.CosignIdentity,
+			osimage.DefaultVerifierOptions,
+		),
+	}
 }
 
 func (a *osImageUpdateAction) runAdapter(_ *cobra.Command, _ []string) error {
@@ -47,7 +61,7 @@ func (a *osImageUpdateAction) runAdapter(_ *cobra.Command, _ []string) error {
 
 func (a *osImageUpdateAction) run() error {
 	finchDir := a.fp.FinchDir(a.finchRootPath)
-	result, err := osimage.CheckForUpdate(a.logger, a.fp)
+	result, err := osimage.CheckForUpdate(a.logger, a.fp, a.baseURL, a.verifier)
 	if err != nil {
 		return err
 	}
@@ -83,6 +97,7 @@ func (a *osImageUpdateAction) run() error {
 	numBackups := a.fc.OSImage.GetNumBackups()
 	if backupEnabled {
 		// +1 to count for the current image.
+		// TODO: LoadHistory should read numBackups
 		history, err := osimage.LoadHistory(finchDir, numBackups+1)
 		if err != nil {
 			// Warn and not return error because image history failing to load
@@ -109,7 +124,11 @@ func (a *osImageUpdateAction) run() error {
 	} else {
 		// Backup is disabled so delete the old image.
 		oldImagePath := filepath.Join(a.fp.OSImageDir(), result.CurrentImage)
-		os.Remove(oldImagePath)
+		if err := os.Remove(oldImagePath); err != nil {
+			a.logger.Warnf("Failed to removed old OS image %s: %v", result.CurrentImage, err)
+		} else {
+			a.logger.Infof("Removed old OS image: %s", result.CurrentImage)
+		}
 	}
 
 	if err := osimage.ClearMetadata(finchDir); err != nil {

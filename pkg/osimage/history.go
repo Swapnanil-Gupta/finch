@@ -80,6 +80,7 @@ func (h *OSImageHistory) RemoveLast() *OSImageHistoryEntry {
 }
 
 // PeekSecondLast is used to peek at the rollback target.
+// The last entry is the currently used image.
 func (h *OSImageHistory) PeekSecondLast() *OSImageHistoryEntry {
 	if len(h.entries) <= 1 {
 		return nil

@@ -48,25 +48,6 @@ func TestPushLast(t *testing.T) {
 		assert.Equal(t, "img-2", h.entries[0].Name)
 		assert.Equal(t, "img-3", h.entries[1].Name)
 	})
-
-	t.Run("push evicts multiple when capacity reduced", func(t *testing.T) {
-		t.Parallel()
-		h := &OSImageHistory{capacity: 2}
-		// Simulate loading 4 entries from a previous config with higher capacity
-		h.entries = []*OSImageHistoryEntry{
-			{Name: "img-1", Digest: "d1"},
-			{Name: "img-2", Digest: "d2"},
-			{Name: "img-3", Digest: "d3"},
-			{Name: "img-4", Digest: "d4"},
-		}
-		evicted := h.PushLast("img-5", "d5")
-
-		require.Len(t, evicted, 3)
-		assert.Equal(t, "img-1", evicted[0].Name)
-		assert.Equal(t, "img-2", evicted[1].Name)
-		assert.Equal(t, "img-3", evicted[2].Name)
-		assert.Equal(t, 2, h.Len())
-	})
 }
 
 func TestRemoveLast(t *testing.T) {
@@ -142,45 +123,6 @@ func TestPeekSecondLast(t *testing.T) {
 	})
 }
 
-func TestLoadAndSaveHistory(t *testing.T) {
-	t.Parallel()
-
-	t.Run("load from non-existent file returns empty history", func(t *testing.T) {
-		t.Parallel()
-		tmpDir := t.TempDir()
-		h, err := LoadHistory(tmpDir, 3)
-		require.NoError(t, err)
-		assert.Equal(t, 0, h.Len())
-	})
-
-	t.Run("save and load round-trip preserves entries", func(t *testing.T) {
-		t.Parallel()
-		tmpDir := t.TempDir()
-		h := NewHistory(3)
-		h.PushLast("img-1", "d1")
-		h.PushLast("img-2", "d2")
-
-		err := SaveHistory(tmpDir, h)
-		require.NoError(t, err)
-
-		loaded, err := LoadHistory(tmpDir, 3)
-		require.NoError(t, err)
-		assert.Equal(t, 2, loaded.Len())
-		assert.Equal(t, "img-1", loaded.entries[0].Name)
-		assert.Equal(t, "img-2", loaded.entries[1].Name)
-	})
-
-	t.Run("load with corrupted file returns error", func(t *testing.T) {
-		t.Parallel()
-		tmpDir := t.TempDir()
-		err := os.WriteFile(filepath.Join(tmpDir, historyFileName), []byte("not json"), 0o644)
-		require.NoError(t, err)
-
-		_, err = LoadHistory(tmpDir, 3)
-		assert.Error(t, err)
-	})
-}
-
 func TestUpdateThenRollbackFlow(t *testing.T) {
 	t.Parallel()
 
@@ -224,5 +166,128 @@ func TestUpdateThenRollbackFlow(t *testing.T) {
 		evicted := h.PushLast("img-new", "d-new")
 		assert.Nil(t, evicted)
 		assert.Equal(t, 2, h.Len())
+	})
+}
+
+func TestResizeHistory(t *testing.T) {
+	t.Parallel()
+
+	t.Run("reducing capacity evicts on next push", func(t *testing.T) {
+		t.Parallel()
+		// Start with capacity 5: [img-1, img-2, img-3, img-4, img-5]
+		h := NewHistory(5)
+		h.PushLast("img-1", "d1")
+		h.PushLast("img-2", "d2")
+		h.PushLast("img-3", "d3")
+		h.PushLast("img-4", "d4")
+		h.PushLast("img-5", "d5")
+		assert.Equal(t, 5, h.Len())
+
+		// Simulate reducing numBackups: reload with capacity 2
+		h.capacity = 2
+
+		// Next push evicts 4 entries to bring size from 6 down to 2
+		evicted := h.PushLast("img-6", "d6")
+		require.Len(t, evicted, 4)
+		assert.Equal(t, "img-1", evicted[0].Name)
+		assert.Equal(t, "img-2", evicted[1].Name)
+		assert.Equal(t, "img-3", evicted[2].Name)
+		assert.Equal(t, "img-4", evicted[3].Name)
+		assert.Equal(t, 2, h.Len())
+		assert.Equal(t, "img-5", h.entries[0].Name)
+		assert.Equal(t, "img-6", h.entries[1].Name)
+	})
+
+	t.Run("increasing capacity allows more entries", func(t *testing.T) {
+		t.Parallel()
+		h := NewHistory(2)
+		h.PushLast("img-1", "d1")
+		h.PushLast("img-2", "d2")
+
+		// Would evict at capacity 2
+		evicted := h.PushLast("img-3", "d3")
+		require.Len(t, evicted, 1)
+		assert.Equal(t, "img-1", evicted[0].Name)
+		assert.Equal(t, 2, h.Len())
+
+		// Simulate increasing numBackups: set capacity to 5
+		h.capacity = 5
+
+		// Now pushes don't evict
+		evicted = h.PushLast("img-4", "d4")
+		assert.Nil(t, evicted)
+		assert.Equal(t, 3, h.Len())
+
+		evicted = h.PushLast("img-5", "d5")
+		assert.Nil(t, evicted)
+		assert.Equal(t, 4, h.Len())
+	})
+
+	t.Run("resize via save and reload", func(t *testing.T) {
+		t.Parallel()
+		tmpDir := t.TempDir()
+
+		// Create history with capacity 5
+		h, err := LoadHistory(tmpDir, 5)
+		require.NoError(t, err)
+		h.PushLast("img-1", "d1")
+		h.PushLast("img-2", "d2")
+		h.PushLast("img-3", "d3")
+		h.PushLast("img-4", "d4")
+		require.NoError(t, SaveHistory(tmpDir, h))
+
+		// Reload with reduced capacity 2 (simulating config change)
+		h, err = LoadHistory(tmpDir, 2)
+		require.NoError(t, err)
+		// Entries are still loaded (4), but next push will trim
+		assert.Equal(t, 4, h.Len())
+
+		evicted := h.PushLast("img-5", "d5")
+		require.Len(t, evicted, 3)
+		assert.Equal(t, "img-1", evicted[0].Name)
+		assert.Equal(t, "img-2", evicted[1].Name)
+		assert.Equal(t, "img-3", evicted[2].Name)
+		assert.Equal(t, 2, h.Len())
+		assert.Equal(t, "img-4", h.entries[0].Name)
+		assert.Equal(t, "img-5", h.entries[1].Name)
+	})
+}
+
+func TestLoadAndSaveHistory(t *testing.T) {
+	t.Parallel()
+
+	t.Run("load from non-existent file returns empty history", func(t *testing.T) {
+		t.Parallel()
+		tmpDir := t.TempDir()
+		h, err := LoadHistory(tmpDir, 3)
+		require.NoError(t, err)
+		assert.Equal(t, 0, h.Len())
+	})
+
+	t.Run("save and load round-trip preserves entries", func(t *testing.T) {
+		t.Parallel()
+		tmpDir := t.TempDir()
+		h := NewHistory(3)
+		h.PushLast("img-1", "d1")
+		h.PushLast("img-2", "d2")
+
+		err := SaveHistory(tmpDir, h)
+		require.NoError(t, err)
+
+		loaded, err := LoadHistory(tmpDir, 3)
+		require.NoError(t, err)
+		assert.Equal(t, 2, loaded.Len())
+		assert.Equal(t, "img-1", loaded.entries[0].Name)
+		assert.Equal(t, "img-2", loaded.entries[1].Name)
+	})
+
+	t.Run("load with corrupted file returns error", func(t *testing.T) {
+		t.Parallel()
+		tmpDir := t.TempDir()
+		err := os.WriteFile(filepath.Join(tmpDir, historyFileName), []byte("not json"), 0o644)
+		require.NoError(t, err)
+
+		_, err = LoadHistory(tmpDir, 3)
+		assert.Error(t, err)
 	})
 }

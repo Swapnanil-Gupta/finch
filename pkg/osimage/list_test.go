@@ -18,7 +18,7 @@ import (
 func TestListImages(t *testing.T) {
 	t.Parallel()
 
-	t.Run("lists qcow2 files", func(t *testing.T) {
+	t.Run("lists qcow2 and .tar.gz files", func(t *testing.T) {
 		t.Parallel()
 		tmpDir := t.TempDir()
 		osDir := filepath.Join(tmpDir, "os")
@@ -26,12 +26,13 @@ func TestListImages(t *testing.T) {
 
 		require.NoError(t, os.WriteFile(filepath.Join(osDir, "img-1.qcow2"), []byte("data"), 0o644))
 		require.NoError(t, os.WriteFile(filepath.Join(osDir, "img-2.qcow2"), []byte("more data"), 0o644))
+		require.NoError(t, os.WriteFile(filepath.Join(osDir, "img-3.tar.gz"), []byte("windows data"), 0o644))
 		require.NoError(t, os.WriteFile(filepath.Join(osDir, "finch.yaml"), []byte("yaml"), 0o644))
 
 		fp := finchPath.Finch(tmpDir)
 		images, err := ListImages(fp)
 		require.NoError(t, err)
-		assert.Len(t, images, 2)
+		assert.Len(t, images, 3)
 	})
 
 	t.Run("skips directories", func(t *testing.T) {

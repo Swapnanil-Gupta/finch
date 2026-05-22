@@ -140,7 +140,7 @@ var newApp = func(
 		newGenDocsCommand(rootCmd, logger, fs, system.NewStdLib()),
 		newLoginLocalCommand(),
 		newLogoutLocalCommand(),
-		newOSImageCommand(logger, fp, fc, finchRootPath),
+		newOSImageCommand(logger, fp, fc, stdOut, finchRootPath),
 	)
 
 	rootCmd.AddCommand(allCommands...)

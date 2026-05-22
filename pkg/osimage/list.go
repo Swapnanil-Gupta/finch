@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	finchPath "github.com/runfinch/finch/pkg/path"
 )
@@ -31,9 +32,10 @@ func ListImages(fp finchPath.Finch) ([]ImageInfo, error) {
 		if entry.IsDir() {
 			continue
 		}
-		ext := filepath.Ext(entry.Name())
+		name := entry.Name()
 		// .qcow2 for macos images and .tar.gz for windows rootfs
-		if ext != ".qcow2" && ext != ".tar.gz" {
+		// TODO: filepath.Ext() return .gz for windows
+		if filepath.Ext(name) != ".qcow2" && !strings.HasSuffix(name, ".tar.gz") {
 			continue
 		}
 		info, err := entry.Info()

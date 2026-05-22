@@ -6,6 +6,7 @@
 package osimage
 
 import (
+	"bytes"
 	"crypto"
 	"encoding/json"
 	"fmt"
@@ -55,17 +56,14 @@ type CheckUpdateResult struct {
 }
 
 const (
-	manifestFileName             = "manifest.json"
-	manifestSignatureFileName    = "manifest.json.sig"
-	manifestBundleFileName       = "manifest.json.bundle"
-	downloadURL                  = "https://deps.runfinch.com/"
-	manifestDownloadURL          = downloadURL + manifestFileName
-	manifestSignatureDownloadURL = downloadURL + manifestSignatureFileName
-	manifestBundleDownloadURL    = downloadURL + manifestBundleFileName
+	manifestFileName = "manifest.json"
+	// manifestSignatureFileName    = "manifest.json.sig"
+	manifestBundleFileName = "manifest.json.bundle"
+	FinchDepsURL           = "https://deps.runfinch.com/"
 )
 
-func CheckForUpdate(logger flog.Logger, fp finchPath.Finch) (*CheckUpdateResult, error) {
-	manifest, err := fetchManifest(logger)
+func CheckForUpdate(logger flog.Logger, fp finchPath.Finch, finchDepsURL string, verifier ManifestVerifier) (*CheckUpdateResult, error) {
+	manifest, err := fetchManifest(logger, finchDepsURL, verifier)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch manifest: %w", err)
 	}
@@ -133,32 +131,32 @@ func Update(logger flog.Logger, fp finchPath.Finch, result *CheckUpdateResult) e
 	return nil
 }
 
-func fetchManifest(logger flog.Logger) (*Manifest, error) {
+func fetchManifest(logger flog.Logger, finchDepsURL string, verifier ManifestVerifier) (*Manifest, error) {
 	logger.Info("Fetching manifest...")
-	// var manifestBuf bytes.Buffer
-	// if err := download(manifestDownloadURL, &manifestBuf); err != nil {
-	// 	return nil, fmt.Errorf("failed to download manifest: %w", err)
-	// }
-	// manifestBytes := manifestBuf.Bytes()
-	// TODO: remove local read
-	signDir := "/Users/swpnlg/Projects/finch/signing"
-	manifestBytes, err := os.ReadFile(filepath.Join(signDir, manifestFileName))
-	if err != nil {
-		return nil, fmt.Errorf("failed to read manifest: %w", err)
+	var manifestBuf bytes.Buffer
+	if err := download(getManifestDownloadUrl(finchDepsURL), &manifestBuf); err != nil {
+		return nil, fmt.Errorf("failed to download manifest: %w", err)
 	}
+	manifestBytes := manifestBuf.Bytes()
+	// TODO: remove local read
+	// signDir := "/Users/swpnlg/Projects/finch/signing"
+	// manifestBytes, err := os.ReadFile(filepath.Join(signDir, manifestFileName))
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to read manifest: %w", err)
+	// }
 
 	logger.Info("Validating manifest...")
-	// var manifestSignBuf bytes.Buffer
-	// if err := download(manifestSignatureDownloadURL, &manifestSignBuf); err != nil {
-	// 	return nil, fmt.Errorf("failed to download manifest signature: %w", err)
-	// }
-	// manifestSignBytes := manifestSignBuf.Bytes()
+	var manifestBundleBuf bytes.Buffer
+	if err := download(getManifestBundleDownloadUrl(finchDepsURL), &manifestBundleBuf); err != nil {
+		return nil, fmt.Errorf("failed to download manifest bundle: %w", err)
+	}
+	manifestBundleBytes := manifestBundleBuf.Bytes()
 	// TODO: remove local read
 	// manifestSignBytes, err := os.ReadFile(filepath.Join(signDir, manifestSignatureFileName))
-	manifestSignBundleBytes, err := os.ReadFile(filepath.Join(signDir, manifestBundleFileName))
-	if err != nil {
-		return nil, fmt.Errorf("failed to read manifest signature: %w", err)
-	}
+	// manifestSignBundleBytes, err := os.ReadFile(filepath.Join(signDir, manifestBundleFileName))
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to read manifest signature: %w", err)
+	// }
 
 	// TODO: Decide b/w asymmetric key vs cosign signature verification
 	// TODO: remove hardcoded path public key path
@@ -169,7 +167,7 @@ func fetchManifest(logger flog.Logger) (*Manifest, error) {
 	// if err := verifySignatureWithPublicKey(manifestBytes, manifestSignBytes, pubKeyBytes); err != nil {
 	// 	return nil, fmt.Errorf("manifest signature validation failed: %w", err)
 	// }
-	if err := verifySignatureWithCosign(manifestBytes, manifestSignBundleBytes); err != nil {
+	if err := verifier.Verify(manifestBytes, manifestBundleBytes); err != nil {
 		return nil, fmt.Errorf("manifest signature validation failed: %w", err)
 	}
 
@@ -214,4 +212,12 @@ func readBaseFinchYaml(fp finchPath.Finch) (*FinchYAML, error) {
 		return nil, fmt.Errorf("failed to unmarshal finch.yaml: %w", err)
 	}
 	return &finchYAML, nil
+}
+
+func getManifestDownloadUrl(baseURL string) string {
+	return baseURL + manifestFileName
+}
+
+func getManifestBundleDownloadUrl(baseURL string) string {
+	return baseURL + manifestBundleFileName
 }

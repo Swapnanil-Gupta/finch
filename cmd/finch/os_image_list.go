@@ -7,6 +7,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"path"
 
 	"github.com/spf13/cobra"
@@ -19,10 +20,11 @@ import (
 type osImageListAction struct {
 	logger flog.Logger
 	fp     finchPath.Finch
+	stdOut io.Writer
 }
 
-func newOSImageListCommand(logger flog.Logger, fp finchPath.Finch) *cobra.Command {
-	action := &osImageListAction{logger: logger, fp: fp}
+func newOSImageListCommand(logger flog.Logger, fp finchPath.Finch, stdOut io.Writer) *cobra.Command {
+	action := &osImageListAction{logger: logger, fp: fp, stdOut: stdOut}
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
@@ -54,9 +56,9 @@ func (a *osImageListAction) run() error {
 	for _, img := range images {
 		marker := "  "
 		if img.Name == currentImageName {
-			marker = "* "
+			marker = "(Current) "
 		}
-		fmt.Printf("%s%s\t%d bytes\n", marker, img.Name, img.Size)
+		fmt.Fprintf(a.stdOut, "%s%s\t%d bytes\n", marker, img.Name, img.Size)
 	}
 	return nil
 }
