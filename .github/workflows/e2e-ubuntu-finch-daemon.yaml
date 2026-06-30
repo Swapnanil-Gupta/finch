@@ -11,7 +11,7 @@ on:
 
 env:
   GO111MODULE: on
-  GO_VERSION: '1.24.11'
+  GO_VERSION: '1.25.7'
 
 permissions:
   id-token: write # used when getting AWS credentials
@@ -66,7 +66,7 @@ jobs:
   
   e2e-test-finch-daemon:
     needs: get-tag-and-version
-    runs-on: codebuild-finch-${{ inputs.arch }}-1-instance-${{ github.run_id }}-${{ github.run_attempt }}
+    runs-on: codebuild-finch-ubuntu-${{ inputs.arch }}-1-instance-${{ github.run_id }}-${{ github.run_attempt }}
     permissions:
       id-token: write # used when getting AWS credentials
       contents: read
@@ -141,6 +141,8 @@ jobs:
           sudo ./scripts/clean-iptables.sh
       - name: Install dependencies
         run: |
+          # fix corrupted dpkg
+          sudo dpkg --configure -a
           sudo apt install build-essential -y
           sudo apt install libseccomp-dev -y
           sudo apt install pkg-config -y

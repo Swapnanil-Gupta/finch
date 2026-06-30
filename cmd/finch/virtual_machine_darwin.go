@@ -19,14 +19,14 @@ import (
 	"github.com/runfinch/finch/pkg/path"
 )
 
-func newDiskVMCommand(creator command.NerdctlCmdCreator, logger flog.Logger) *cobra.Command {
+func newDiskVMCommand(creator command.NerdctlCmdCreator, logger flog.Logger, lca config.LimaConfigApplier, fs afero.Fs) *cobra.Command {
 	diskCmd := &cobra.Command{
 		Use:   "disk",
 		Short: "Manage virtual machine disk operations",
 	}
 
 	diskCmd.AddCommand(
-		newVMDiskResizeCommand(creator, logger),
+		newVMDiskResizeCommand(creator, logger, lca, fs),
 		newVMDiskInfoCommand(creator, logger),
 	)
 
@@ -42,6 +42,7 @@ func newVirtualMachineCommand(
 	fp path.Finch,
 	fs afero.Fs,
 	diskManager disk.UserDataDiskManager,
+	finchConfig *config.Finch,
 ) *cobra.Command {
 	virtualMachineCommand := &cobra.Command{
 		Use:   virtualMachineRootCmd,
@@ -54,9 +55,9 @@ func newVirtualMachineCommand(
 		newRemoveVMCommand(limaCmdCreator, diskManager, logger),
 		newStatusVMCommand(limaCmdCreator, logger, os.Stdout),
 		newInitVMCommand(limaCmdCreator, logger, optionalDepGroups, lca, nca, fp.BaseYamlFilePath(), fs,
-			fp.LimaSSHPrivateKeyPath(), diskManager),
+			fp.LimaSSHPrivateKeyPath(), diskManager, finchConfig),
 		newSettingsVMCommand(logger, lca, fs, os.Stdout),
-		newDiskVMCommand(limaCmdCreator, logger),
+		newDiskVMCommand(limaCmdCreator, logger, lca, fs),
 	)
 
 	return virtualMachineCommand

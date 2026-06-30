@@ -1,5 +1,6 @@
 name: Build, test and upload .deb to S3
 
+# The scheduler runs at 6 AM PST (14:00 UTC) every day.
 on:
   workflow_dispatch:
     inputs:
@@ -13,10 +14,10 @@ on:
         required: true
         type: string
   schedule:
-    - cron: '0 9 * * *'
+    - cron: '0 14 * * *'
 env:
   GO111MODULE: on
-  GO_VERSION: '1.24.11'
+  GO_VERSION: '1.25.7'
 
 permissions:
   # This is required for configure-aws-credentials to request an OIDC JWT ID token to access AWS resources later on.
@@ -75,7 +76,7 @@ jobs:
             output-arch: 'amd64'
           - arch: 'arm64'
             output-arch: 'arm64'
-    runs-on: codebuild-finch-${{ matrix.arch }}-2-instance-${{ github.run_id }}-${{ github.run_attempt }}
+    runs-on: codebuild-finch-ubuntu-${{ matrix.arch }}-2-instance-${{ github.run_id }}-${{ github.run_attempt }}
     timeout-minutes: 60
     steps:
         - name: Configure AWS credentials

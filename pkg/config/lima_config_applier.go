@@ -9,20 +9,27 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/lima-vm/lima/pkg/limayaml"
+	"github.com/lima-vm/lima/v2/pkg/limatype"
 	"github.com/spf13/afero"
 	"github.com/xorcare/pointer"
 	"golang.org/x/exp/slices"
 	"gopkg.in/yaml.v3"
 
 	"github.com/runfinch/finch/pkg/command"
+	"github.com/runfinch/finch/pkg/flog"
 	"github.com/runfinch/finch/pkg/system"
 )
 
+var (
+	// SociVersion will be injected via Makefile.
+	SociVersion string
+	// SociAMD64Sha256Sum will be injected via Makefile.
+	SociAMD64Sha256Sum string
+	// SociARM64Sha256Sum will be injected via Makefile.
+	SociARM64Sha256Sum string
+)
+
 const (
-	sociVersion                              = "0.11.1"
-	sociAMD64Sha256Sum                       = "52d72692880150f974a48dbfa44bff01f1a3ba97815658cc16f835e5e7f96d49"
-	sociARM64Sha256Sum                       = "da055b182000dbac3e916a8c731cbc0d7a204791311260c94d960a1160d25b3e"
 	snapshotterProvisioningScriptHeader      = "# snapshotter provisioning script"
 	sociInstallationProvisioningScriptHeader = snapshotterProvisioningScriptHeader + ": soci"
 	sociFileNameFormat                       = "soci-snapshotter-%s-linux-%s.tar.gz"
@@ -128,23 +135,25 @@ func NewLimaApplier(
 
 // ConfigureDefaultLimaYaml writes Lima-specific config values from Finch's config to default.yaml at lima config file path.
 // ConfigureDefaultLimaYaml will create a default.yaml at the path if it does not exist.
-func (lca *limaConfigApplier) ConfigureDefaultLimaYaml() error {
+func (lca *limaConfigApplier) ConfigureDefaultLimaYaml(logger flog.Logger) error {
 	if err := afero.WriteFile(lca.fs, lca.limaDefaultConfigPath, []byte(""), 0o600); err != nil {
 		return fmt.Errorf("failed to create the an empty lima config file: %w", err)
 	}
 
-	var limaCfg limayaml.LimaYAML
-
-	if limaCfg.Rosetta.Enabled == nil {
-		limaCfg.Rosetta.Enabled = pointer.Bool(false)
-		limaCfg.Rosetta.BinFmt = pointer.Bool(false)
+	var limaCfg limatype.LimaYAML
+	var vzOpts limatype.VZOpts
+	vzOpts.Rosetta.Enabled = pointer.Bool(false)
+	vzOpts.Rosetta.BinFmt = pointer.Bool(false)
+	if limaCfg.VMOpts == nil {
+		limaCfg.VMOpts = make(map[limatype.VMType]any)
 	}
+	limaCfg.VMOpts[limatype.VZ] = &vzOpts
 
 	if lca.cfg.Experimental.MountInotify {
 		limaCfg.MountInotify = pointer.Bool(lca.cfg.Experimental.MountInotify)
 	}
 
-	cfgAfterInit, err := lca.configureVirtualizationFramework(&limaCfg)
+	cfgAfterInit, err := lca.configureVirtualizationFramework(&limaCfg, logger)
 	if err != nil {
 		return fmt.Errorf("failed to apply init-only config values: %w", err)
 	}
@@ -168,13 +177,15 @@ func (lca *limaConfigApplier) ConfigureOverrideLimaYaml() error {
 	if err := afero.WriteFile(lca.fs, lca.limaOverrideConfigPath, []byte(""), 0o600); err != nil {
 		return fmt.Errorf("failed to create the an empty lima config file: %w", err)
 	}
-	var limaCfg limayaml.LimaYAML
+	var limaCfg limatype.LimaYAML
 
 	lca.configureCPUs(&limaCfg)
 	lca.configureMemory(&limaCfg)
 	lca.configureMounts(&limaCfg)
+	lca.configureDisk(&limaCfg)
+
 	if *lca.cfg.VMType != "wsl2" && len(limaCfg.AdditionalDisks) == 0 {
-		limaCfg.AdditionalDisks = append(limaCfg.AdditionalDisks, limayaml.Disk{
+		limaCfg.AdditionalDisks = append(limaCfg.AdditionalDisks, limatype.Disk{
 			Name: "finch",
 		})
 	}
@@ -213,7 +224,7 @@ func validateSnapshotter(snapshotter string) error {
 	return nil
 }
 
-func (lca *limaConfigApplier) configureDefaultSnapshotter(limaCfg *limayaml.LimaYAML) error {
+func (lca *limaConfigApplier) configureDefaultSnapshotter(limaCfg *limatype.LimaYAML) error {
 	if len(lca.cfg.Snapshotters) == 0 {
 		limaCfg.Env = map[string]string{}
 		return nil
@@ -230,7 +241,7 @@ func (lca *limaConfigApplier) configureDefaultSnapshotter(limaCfg *limayaml.Lima
 	return nil
 }
 
-func (lca *limaConfigApplier) provisionSnapshotters(limaCfg *limayaml.LimaYAML) error {
+func (lca *limaConfigApplier) provisionSnapshotters(limaCfg *limatype.LimaYAML) error {
 	for _, snapshotter := range lca.cfg.Snapshotters {
 		switch snapshotter {
 		case "soci":
@@ -245,15 +256,15 @@ func (lca *limaConfigApplier) provisionSnapshotters(limaCfg *limayaml.LimaYAML) 
 	return nil
 }
 
-func (lca *limaConfigApplier) provisionSociSnapshotter(limaCfg *limayaml.LimaYAML) {
+func (lca *limaConfigApplier) provisionSociSnapshotter(limaCfg *limatype.LimaYAML) {
 	arch := lca.systemDeps.Arch()
-	sociFileName := fmt.Sprintf(sociFileNameFormat, sociVersion, arch)
-	sociDownloadURL := fmt.Sprintf(sociDownloadURLFormat, sociVersion, sociFileName)
-	sociSha256Sum := sociAMD64Sha256Sum
+	sociFileName := fmt.Sprintf(sociFileNameFormat, SociVersion, arch)
+	sociDownloadURL := fmt.Sprintf(sociDownloadURLFormat, SociVersion, sociFileName)
+	sociSha256Sum := SociAMD64Sha256Sum
 	if arch == "arm64" {
-		sociSha256Sum = sociARM64Sha256Sum
+		sociSha256Sum = SociARM64Sha256Sum
 	}
-	sociServiceDownloadURL := fmt.Sprintf(sociServiceDownloadURLFormat, sociVersion)
+	sociServiceDownloadURL := fmt.Sprintf(sociServiceDownloadURLFormat, SociVersion)
 
 	// Platform-specific DOCKER_CONFIG for SOCI service (macOS only)
 	// This is needed as DOCKER_CONFIG for SOCI defaults to ~/.finch/config,
@@ -270,29 +281,30 @@ func (lca *limaConfigApplier) provisionSociSnapshotter(limaCfg *limayaml.LimaYAM
 
 	sociInstallationScript := fmt.Sprintf(sociInstallationScriptFormat, sociInstallationProvisioningScriptHeader,
 		sociFileName, sociDownloadURL, sociSha256Sum, sociServiceDownloadURL, dockerConfigSetup)
-	limaCfg.Provision = append(limaCfg.Provision, limayaml.Provision{
+	limaCfg.Provision = append(limaCfg.Provision, limatype.Provision{
 		Mode:   "system",
-		Script: sociInstallationScript,
+		Script: &sociInstallationScript,
 	})
 }
 
-func ensureWslDiskFormatScript(limaCfg *limayaml.LimaYAML) {
+func ensureWslDiskFormatScript(limaCfg *limatype.LimaYAML) {
 	if hasScript := findWslDiskFormatScript(limaCfg); !hasScript {
-		limaCfg.Provision = append(limaCfg.Provision, limayaml.Provision{
-			Mode: "system",
-			Script: fmt.Sprintf(`%s
+		scriptContent := fmt.Sprintf(`%s
 #!/bin/bash
 mkdir -p /mnt/lima-finch
 mount "$(blkid -s TYPE -t LABEL=FinchDataDisk -o device)" /mnt/lima-finch
-`, wslDiskFormatScriptHeader),
+`, wslDiskFormatScriptHeader)
+		limaCfg.Provision = append(limaCfg.Provision, limatype.Provision{
+			Mode:   "system",
+			Script: &scriptContent,
 		})
 	}
 }
 
-func findWslDiskFormatScript(limaCfg *limayaml.LimaYAML) bool {
+func findWslDiskFormatScript(limaCfg *limatype.LimaYAML) bool {
 	hasWslDiskFormatScript := false
 	for _, prov := range limaCfg.Provision {
-		trimmed := strings.Trim(prov.Script, " ")
+		trimmed := strings.Trim(*prov.Script, " ")
 		if !hasWslDiskFormatScript && strings.HasPrefix(trimmed, wslDiskFormatScriptHeader) {
 			hasWslDiskFormatScript = true
 			break

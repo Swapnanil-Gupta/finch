@@ -1,5 +1,71 @@
 # Changelog
 
+## [1.17.0](https://github.com/runfinch/finch/compare/v1.16.0...v1.17.0) (2026-04-24)
+
+
+### Build System or External Dependencies
+
+* **deps:** bump github.com/containerd/nerdctl/v2 from 2.2.1 to 2.2.2 ([#1736](https://github.com/runfinch/finch/issues/1736)) ([d561171](https://github.com/runfinch/finch/commit/d5611716499444008e90e5dad6b59833fe969381))
+* **deps:** bump github.com/docker/cli ([8b0ac64](https://github.com/runfinch/finch/commit/8b0ac6473d8cdc12d8e45eb75c9e28e06cf48819))
+* **deps:** bump github.com/docker/cli from 29.1.3+incompatible to 29.2.0+incompatible ([#1714](https://github.com/runfinch/finch/issues/1714)) ([8b0ac64](https://github.com/runfinch/finch/commit/8b0ac6473d8cdc12d8e45eb75c9e28e06cf48819))
+* **deps:** bump github.com/go-jose/go-jose/v4 from 4.1.3 to 4.1.4 ([#1732](https://github.com/runfinch/finch/issues/1732)) ([802ce82](https://github.com/runfinch/finch/commit/802ce82b241436d6e6639334a0f1b9c391e3f49b))
+* **deps:** bump golang.org/x/image from 0.18.0 to 0.38.0 ([#1731](https://github.com/runfinch/finch/issues/1731)) ([05a28ee](https://github.com/runfinch/finch/commit/05a28eef28264746383ed5148b8980016e7c1c4c))
+* **deps:** bump google.golang.org/grpc from 1.78.0 to 1.79.3 ([#1725](https://github.com/runfinch/finch/issues/1725)) ([2d36408](https://github.com/runfinch/finch/commit/2d36408e4beccbec35874fd587f572a3c4fe553b))
+* **deps:** Bump submodules and dependencies ([#1728](https://github.com/runfinch/finch/issues/1728)) ([80958a6](https://github.com/runfinch/finch/commit/80958a6b3965787a540717bd6e863f3c16ab11ec))
+
+
+### Features
+
+* make disk sizes configurable on macos ([#1733](https://github.com/runfinch/finch/issues/1733)) ([916da69](https://github.com/runfinch/finch/commit/916da699d34d4fe0cc1edca9e87a048a05bf2deb))
+
+## [1.16.0](https://github.com/runfinch/finch/compare/v1.15.1...v1.16.0) (2026-03-19)
+
+
+### Build System or External Dependencies
+
+* **deps:** Bump submodules and dependencies ([#1708](https://github.com/runfinch/finch/issues/1708)) ([b6ba659](https://github.com/runfinch/finch/commit/b6ba659ad961f73400e91d366ca0dfaa1ea0ef80))
+
+
+### Features
+
+* add mkosi based AL2023 images ([#1716](https://github.com/runfinch/finch/issues/1716)) ([40e5350](https://github.com/runfinch/finch/commit/40e5350972d3dd8741e42ce18336bbe919771400))
+
+
+### Bug Fixes
+
+* move samcli-vm tests to finch ([#1710](https://github.com/runfinch/finch/issues/1710)) ([a610930](https://github.com/runfinch/finch/commit/a6109308206186a53a8a4699a4228c1e7310e117))
+
+## [1.15.1](https://github.com/runfinch/finch/compare/v1.15.0...v1.15.1) (2026-02-26)
+
+
+### Bug Fixes
+
+* DOCKER_CONFIG mismatch between login/logout and registry operations ([#1703](https://github.com/runfinch/finch/issues/1703)) ([eb331f1](https://github.com/runfinch/finch/commit/eb331f1fc8cbb11396de3cc3081f223684bed4a3))
+
+## [1.15.0](https://github.com/runfinch/finch/compare/v1.14.1...v1.15.0) (2026-02-19)
+
+
+### Build System or External Dependencies
+
+* **deps:** Bump submodules and dependencies ([#1674](https://github.com/runfinch/finch/issues/1674)) ([15ee208](https://github.com/runfinch/finch/commit/15ee2087531b61c7dc942b2395aab98ec2a9084a))
+* **deps:** read lima version from finch-core ([#1700](https://github.com/runfinch/finch/issues/1700)) ([1921302](https://github.com/runfinch/finch/commit/192130252eaa683bbe8671d6c14c21739b106c76))
+
+
+### Features
+
+* inject deps from finch-core ([#1679](https://github.com/runfinch/finch/issues/1679)) ([a94c922](https://github.com/runfinch/finch/commit/a94c922307fa7e9e611af24aeb4eed1c92cc0b8f))
+* support native credstore in macOS ([#1680](https://github.com/runfinch/finch/issues/1680)) ([df487c0](https://github.com/runfinch/finch/commit/df487c0d5db1e199082f78a43aa553d5957e0227))
+
+
+### Bug Fixes
+
+* generate date-agnostic gzip files ([#1676](https://github.com/runfinch/finch/issues/1676)) ([4e3d3fa](https://github.com/runfinch/finch/commit/4e3d3faeca77a2ee58915617b95520843b3bf28d))
+* improve logging for Finch pkg ([#1697](https://github.com/runfinch/finch/issues/1697)) ([af2d97e](https://github.com/runfinch/finch/commit/af2d97efaa0519e921bd4bb345a53dfc531b102a))
+* increase timeout for aws creds for signing ([#1689](https://github.com/runfinch/finch/issues/1689)) ([e8c54b9](https://github.com/runfinch/finch/commit/e8c54b9aef876700ce5214ba1ec4b91dba63b15a))
+* remove multiple cp commands that overwrites older installers ([#1681](https://github.com/runfinch/finch/issues/1681)) ([2c26c9b](https://github.com/runfinch/finch/commit/2c26c9ba7ab9349236704db5301017dd0c8ca694))
+* reschedule nightly  ([#1691](https://github.com/runfinch/finch/issues/1691)) ([8346549](https://github.com/runfinch/finch/commit/834654935282499c9e6e5aa7b5b0be70b3f369e9))
+* Set mirrored network mode for wsl host to vm networking test in … ([#1688](https://github.com/runfinch/finch/issues/1688)) ([b8fefdb](https://github.com/runfinch/finch/commit/b8fefdb6b54d6add7e0695cd286f1860e3ced1bf))
+
 ## [1.14.1](https://github.com/runfinch/finch/compare/v1.14.0...v1.14.1) (2026-01-14)
 
 

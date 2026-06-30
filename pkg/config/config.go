@@ -31,7 +31,44 @@ type AdditionalDirectory struct {
 
 // SharedSystemSettings represents all settings shared by virtualized Finch configurations.
 type SharedSystemSettings struct {
-	VMType *limayaml.VMType `yaml:"vmType,omitempty"`
+	VMType  *limayaml.VMType `yaml:"vmType,omitempty"`
+	OSImage OSImageSettings  `yaml:"os_image,omitempty"`
+}
+
+// OSImageSettings represents settings for OS image management.
+type OSImageSettings struct {
+	UpdateNotifications *bool `yaml:"update_notifications,omitempty"`
+	Backup              *bool `yaml:"backup,omitempty"`
+	NumBackups          *int  `yaml:"num_backups,omitempty"`
+}
+
+// UpdateNotificationsEnabled returns whether OS image update notifications are enabled.
+// Defaults to true if not explicitly set.
+func (s *OSImageSettings) UpdateNotificationsEnabled() bool {
+	if s.UpdateNotifications == nil {
+		return true
+	}
+	return *s.UpdateNotifications
+}
+
+// BackupEnabled returns whether OS image backups are enabled.
+// Defaults to true if not explicitly set.
+func (s *OSImageSettings) BackupEnabled() bool {
+	if s.Backup == nil {
+		return true
+	}
+	return *s.Backup
+}
+
+const defaultNumBackups = 3
+
+// GetNumBackups returns the number of backup images to retain.
+// Defaults to 3 if not explicitly set.
+func (s *OSImageSettings) GetNumBackups() int {
+	if s.NumBackups == nil || *s.NumBackups < 1 {
+		return defaultNumBackups
+	}
+	return *s.NumBackups
 }
 
 // SharedSettings represents settings shared by all Finch configurations.
@@ -66,14 +103,18 @@ type Nerdctl struct {
 
 // VMConfigOpts represents the Options for finch vm settings command.
 type VMConfigOpts struct {
-	CPUs   *int
-	Memory *string
+	CPUs     *int
+	Memory   *string
+	BootDisk *string
+	DataDisk *string
 }
 
-// Default values for the command line arguments --cpus and --memory.
+// Default values for the command line arguments --cpus, --memory, --bootdisk and --datadisk.
 const (
-	DefaultCPUs   = 0
-	DefaultMemory = ""
+	DefaultCPUs     = 0
+	DefaultMemory   = ""
+	DefaultBootDisk = ""
+	DefaultDataDisk = ""
 )
 
 // LimaConfigApplier applies lima configuration changes.
@@ -81,7 +122,7 @@ const (
 //go:generate mockgen -copyright_file=../../copyright_header -destination=../mocks/pkg_config_lima_config_applier.go -package=mocks -mock_names LimaConfigApplier=LimaConfigApplier . LimaConfigApplier
 type LimaConfigApplier interface {
 	ConfigureOverrideLimaYaml() error
-	ConfigureDefaultLimaYaml() error
+	ConfigureDefaultLimaYaml(logger flog.Logger) error
 	GetFinchConfigPath() string
 }
 

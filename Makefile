@@ -12,6 +12,7 @@ COVERAGE_DIR ?= $(CURDIR)/cov
 REPORT_DIR ?= $(CURDIR)/reports
 RUN_ID ?= $(GITHUB_RUN_ID)
 RUN_ATTEMPT ?= $(GITHUB_RUN_ATTEMPT)
+FINCH_CORE_DIR := $(CURDIR)/deps/finch-core
 
 OUTPUT_DIRECTORIES := $(OUTDIR) $(OS_OUTDIR)
 $(OUTPUT_DIRECTORIES):
@@ -34,8 +35,25 @@ GITCOMMIT ?= $(shell git rev-parse HEAD)$(shell test -z "$(git status --porcelai
 VERSION_INJECTION := -X $(PACKAGE)/pkg/version.Version=$(VERSION)
 VERSION_INJECTION += -X $(PACKAGE)/pkg/version.GitCommit=$(GITCOMMIT)
 VERSION_INJECTION += -X $(PACKAGE)/pkg/version.GitCommit=$(GITCOMMIT)
-LDFLAGS = "-w $(VERSION_INJECTION)"
 MIN_MACOS_VERSION ?= 11.0
+
+# Inject soci version
+-include $(FINCH_CORE_DIR)/deps/soci.conf
+VERSION_INJECTION += -X $(PACKAGE)/pkg/config.SociVersion=$(SOCI_VERSION)
+VERSION_INJECTION += -X $(PACKAGE)/pkg/config.SociAMD64Sha256Sum=$(SOCI_AMD64_SHA256_DIGEST)
+VERSION_INJECTION += -X $(PACKAGE)/pkg/config.SociARM64Sha256Sum=$(SOCI_ARM64_SHA256_DIGEST)
+
+# Inject ecr-cred-helper version
+-include $(FINCH_CORE_DIR)/deps/ecr-cred-helper.conf
+VERSION_INJECTION += -X $(PACKAGE)/pkg/dependency/credhelper.EcrVersion=$(ECR_CRED_HELPER_VERSION)
+VERSION_INJECTION += -X $(PACKAGE)/pkg/dependency/credhelper.EcrAMD64Hash=$(ECR_CRED_HELPER_AMD64_DIGEST)
+VERSION_INJECTION += -X $(PACKAGE)/pkg/dependency/credhelper.EcrARM64Hash=$(ECR_CRED_HELPER_ARM64_DIGEST)
+
+# Enable runtime FINCH_DEPS_* env overrides. Compiled in only for os-image e2e builds so
+# production binaries cannot be redirected to an arbitrary manifest source via the environment.
+ifdef FINCH_OSIMAGE_ALLOW_ENV_OVERRIDES
+VERSION_INJECTION += -X $(PACKAGE)/pkg/osimage.allowEnvOverrides=$(FINCH_OSIMAGE_ALLOW_ENV_OVERRIDES)
+endif
 
 FINCH_DAEMON_LOCATION_ROOT ?= $(FINCH_OS_IMAGE_LOCATION_ROOT)/finch-daemon
 FINCH_DAEMON_LOCATION ?= $(FINCH_DAEMON_LOCATION_ROOT)/finch-daemon
@@ -63,11 +81,11 @@ endif
 
 # This variable is used to inject the version of Lima (via ldflags) to be used with Lima's
 # osutil.LimaUser function.
-LIMA_TAG=$(shell cd deps/finch-core/src/lima && git describe --match 'v[0-9]*' --dirty='.modified'  --abbrev=0 --always --tags)
-LIMA_VERSION := $(patsubst v%,%,$(LIMA_TAG))
+-include $(FINCH_CORE_DIR)/deps/lima-bundles.conf
 # This value isn't used on Linux, but the symbol is currently defined on all platforms, so
 # it doesn't hurt to always inject it right now.
 VERSION_INJECTION += -X $(PACKAGE)/pkg/lima.LimaVersion=$(LIMA_VERSION)
+LDFLAGS = "-w $(VERSION_INJECTION)"
 
 .PHONY: arch-test
 arch-test:
@@ -81,9 +99,7 @@ ifeq ($(BUILD_OS),)
 BUILD_OS = $(shell uname -s)
 endif
 
-FINCH_CORE_DIR := $(CURDIR)/deps/finch-core
-
-remote-all: arch-test install.finch-core-dependencies finch finch.yaml networks.yaml config.yaml $(OUTDIR)/finch-daemon/finch@.service
+remote-all: arch-test finch install.finch-core-dependencies finch.yaml networks.yaml config.yaml $(OUTDIR)/finch-daemon/finch@.service
 
 ifeq ($(BUILD_OS), Windows_NT)
 include Makefile.windows
@@ -108,13 +124,13 @@ CONTAINER_RUNTIME_ARCHIVE_AARCH64_DIGEST ?= "sha256:$(AARCH64_256_DIGEST)"
 CONTAINER_RUNTIME_ARCHIVE_X86_64_LOCATION ?= "$(ARTIFACT_BASE_URL)/$(X86_64_ARTIFACT)"
 CONTAINER_RUNTIME_ARCHIVE_X86_64_DIGEST ?= "sha256:$(X86_64_256_DIGEST)"
 
-# For Finch on macOS and Windows, the runc override locations and digests are set
-# based on the values set in deps/finch-core/deps/runc-override.conf
--include $(FINCH_CORE_DIR)/deps/runc-override.conf
-RUNC_OVERRIDE_AARCH64_LOCATION ?= "$(RUNC_ARTIFACT_BASE_URL)/$(RUNC_AARCH64_ARTIFACT)"
-RUNC_OVERRIDE_AARCH64_DIGEST ?= "sha256:$(RUNC_AARCH64_256_DIGEST)"
-RUNC_OVERRIDE_X86_64_LOCATION ?= "$(RUNC_ARTIFACT_BASE_URL)/$(RUNC_X86_64_ARTIFACT)"
-RUNC_OVERRIDE_X86_64_DIGEST ?= "sha256:$(RUNC_X86_64_256_DIGEST)"
+# Inject dependency versions for E2E VM serial tests
+E2E_VM_VERSION_INJECTION := $(VERSION_INJECTION)
+E2E_VM_VERSION_INJECTION += -X $(PACKAGE)/e2e/vm.NerdctlVersion=v$(NERDCTL_VERSION)
+E2E_VM_VERSION_INJECTION += -X $(PACKAGE)/e2e/vm.ContainerdVersion=v$(CONTAINERD_VERSION)
+E2E_VM_VERSION_INJECTION += -X $(PACKAGE)/e2e/vm.BuildKitVersion=v$(BUILDKIT_VERSION)
+E2E_VM_VERSION_INJECTION += -X $(PACKAGE)/e2e/vm.RuncVersion=$(RUNC_VERSION)
+E2E_VM_LDFLAGS := -w $(E2E_VM_VERSION_INJECTION)
 
 .PHONY: finch.yaml
 finch.yaml: $(OS_OUTDIR)/finch.yaml
@@ -345,19 +361,32 @@ create-report-dir:
 	mkdir -p $(REPORT_DIR)
 
 .PHONY: test-e2e
-test-e2e: test-e2e-vm-serial test-e2e-container
+test-e2e: test-e2e-vm-serial test-e2e-container test-e2e-osimage
 
 .PHONY: test-e2e-vm-serial
 test-e2e-vm-serial: create-report-dir create-coverage-dir add-credhelper-to-path
-	FINCH_GOCOVERDIR=$(COVERAGE_DIR) go test -coverpkg=./... -ldflags $(LDFLAGS) -timeout 2h ./e2e/vm -test.v -test.gocoverdir=$(COVERAGE_DIR) -ginkgo.v -ginkgo.timeout=2h -ginkgo.flake-attempts=3 -ginkgo.json-report=$(REPORT_DIR)/$(RUN_ID)-$(RUN_ATTEMPT)-e2e-vm-serial-report.json --installed="$(INSTALLED)"
+	FINCH_GOCOVERDIR=$(COVERAGE_DIR) go test -coverpkg=./... -ldflags "$(E2E_VM_LDFLAGS)" -timeout 2h ./e2e/vm -test.v -test.gocoverdir=$(COVERAGE_DIR) -ginkgo.vv -ginkgo.timeout=2h -ginkgo.flake-attempts=3 -ginkgo.json-report=$(REPORT_DIR)/$(RUN_ID)-$(RUN_ATTEMPT)-e2e-vm-serial-report.json --installed="$(INSTALLED)"
 
 .PHONY: test-e2e-container
 test-e2e-container: create-report-dir create-coverage-dir add-credhelper-to-path
-	FINCH_GOCOVERDIR=$(COVERAGE_DIR) go test -coverpkg=./... -ldflags $(LDFLAGS) -timeout 2h ./e2e/container -test.v -test.gocoverdir=$(COVERAGE_DIR) -ginkgo.v -ginkgo.timeout=2h -ginkgo.flake-attempts=3 -ginkgo.json-report=$(REPORT_DIR)/$(RUN_ID)-$(RUN_ATTEMPT)-e2e-container-report.json --installed="$(INSTALLED)"
+	FINCH_GOCOVERDIR=$(COVERAGE_DIR) go test -coverpkg=./... -ldflags $(LDFLAGS) -timeout 2h ./e2e/container -test.v -test.gocoverdir=$(COVERAGE_DIR) -ginkgo.vv -ginkgo.timeout=2h -ginkgo.flake-attempts=3 -ginkgo.json-report=$(REPORT_DIR)/$(RUN_ID)-$(RUN_ATTEMPT)-e2e-container-report.json --installed="$(INSTALLED)"
+
+.PHONY: test-e2e-osimage
+# NOTE: the finch binary under test must be built with FINCH_OSIMAGE_ALLOW_ENV_OVERRIDES=true
+# (e.g. `make finch FINCH_OSIMAGE_ALLOW_ENV_OVERRIDES=true`) so the suite can redirect the
+# updater at its local test server. Without it the env overrides are ignored by design and
+# the update specs will hit the production deps endpoint.
+test-e2e-osimage: create-report-dir create-coverage-dir
+	FINCH_GOCOVERDIR=$(COVERAGE_DIR) \
+	go test \
+		-coverpkg=./... -ldflags $(LDFLAGS) -timeout 10m ./e2e/osimage \
+		-test.v -test.gocoverdir=$(COVERAGE_DIR) \
+		-ginkgo.vv -ginkgo.timeout=10m -ginkgo.json-report=$(REPORT_DIR)/$(RUN_ID)-$(RUN_ATTEMPT)-e2e-osimage-report.json \
+		--installed="$(INSTALLED)"
 
 .PHONY: test-e2e-vm
 test-e2e-vm: create-report-dir create-coverage-dir
-	FINCH_GOCOVERDIR=$(COVERAGE_DIR) go test -coverpkg=./... -ldflags $(LDFLAGS) -timeout 2h ./e2e/vm -test.v -test.gocoverdir=$(COVERAGE_DIR) -ginkgo.v -ginkgo.timeout=2h  -ginkgo.focus "updates init-only config values when values are changed after init" -ginkgo.flake-attempts=3 -ginkgo.json-report=$(REPORT_DIR)/$(RUN_ID)-$(RUN_ATTEMPT)-e2e-vm-report.json --installed="$(INSTALLED)" --registry="$(REGISTRY)"
+	FINCH_GOCOVERDIR=$(COVERAGE_DIR) go test -coverpkg=./... -ldflags "$(E2E_VM_LDFLAGS)" -timeout 2h ./e2e/vm -test.v -test.gocoverdir=$(COVERAGE_DIR) -ginkgo.vv -ginkgo.timeout=2h -ginkgo.flake-attempts=3 -ginkgo.json-report=$(REPORT_DIR)/$(RUN_ID)-$(RUN_ATTEMPT)-e2e-vm-report.json --installed="$(INSTALLED)" --registry="$(REGISTRY)"
 
 .PHONY: test-e2e-cov
 test-e2e-cov:
@@ -386,7 +415,9 @@ test-e2e-daemon:
 	DOCKER_HOST=$(DAEMON_DOCKER_HOST) \
 	DOCKER_API_VERSION="v1.41" \
 	TEST_E2E=1 \
-	go test ./e2e -timeout 15m -test.v -ginkgo.v -ginkgo.randomize-all -ginkgo.json-report=$(REPORT_DIR)/$(RUN_ID)-$(RUN_ATTEMPT)-e2e-daemon-report.json \
+	go test ./e2e -timeout 30m -test.v -ginkgo.vv \
+	  -ginkgo.randomize-all -ginkgo.flake-attempts=3 \
+	  -ginkgo.json-report=$(REPORT_DIR)/$(RUN_ID)-$(RUN_ATTEMPT)-e2e-daemon-report.json \
 	  --subject="$(OUTDIR)/bin/$(BINARYNAME)" \
 	  --daemon-context-subject-prefix="$(OUTDIR)/lima/bin/limactl shell finch sudo" \
 	  --daemon-context-subject-env="LIMA_HOME=$(OUTDIR)/lima/data"
@@ -402,7 +433,7 @@ test-e2e-daemon-linux:
 	DOCKER_HOST="unix:///run/finch.sock" \
 	DOCKER_API_VERSION="v1.41" \
 	TEST_E2E=1 \
-	go test ./e2e -p 1 -timeout 2h -test.v -ginkgo.v \
+	go test ./e2e -p 1 -timeout 2h -test.v -ginkgo.vv \
 	-ginkgo.flake-attempts=3 \
 	-ginkgo.skip="should create container with specified blkio settings options" \
 	-ginkgo.randomize-all  -ginkgo.json-report=$(REPORT_DIR)/$(RUN_ID)-$(RUN_ATTEMPT)-e2e-daemon-report.json \
