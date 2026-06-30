@@ -45,8 +45,8 @@ func TestPushLast(t *testing.T) {
 		require.Len(t, evicted, 1)
 		assert.Equal(t, "img-1", evicted[0].Name)
 		assert.Equal(t, 2, h.Len())
-		assert.Equal(t, "img-2", h.entries[0].Name)
-		assert.Equal(t, "img-3", h.entries[1].Name)
+		assert.Equal(t, "img-2", h.Images[0].Name)
+		assert.Equal(t, "img-3", h.Images[1].Name)
 	})
 }
 
@@ -194,8 +194,8 @@ func TestResizeHistory(t *testing.T) {
 		assert.Equal(t, "img-3", evicted[2].Name)
 		assert.Equal(t, "img-4", evicted[3].Name)
 		assert.Equal(t, 2, h.Len())
-		assert.Equal(t, "img-5", h.entries[0].Name)
-		assert.Equal(t, "img-6", h.entries[1].Name)
+		assert.Equal(t, "img-5", h.Images[0].Name)
+		assert.Equal(t, "img-6", h.Images[1].Name)
 	})
 
 	t.Run("increasing capacity allows more entries", func(t *testing.T) {
@@ -248,8 +248,8 @@ func TestResizeHistory(t *testing.T) {
 		assert.Equal(t, "img-2", evicted[1].Name)
 		assert.Equal(t, "img-3", evicted[2].Name)
 		assert.Equal(t, 2, h.Len())
-		assert.Equal(t, "img-4", h.entries[0].Name)
-		assert.Equal(t, "img-5", h.entries[1].Name)
+		assert.Equal(t, "img-4", h.Images[0].Name)
+		assert.Equal(t, "img-5", h.Images[1].Name)
 	})
 }
 
@@ -277,8 +277,8 @@ func TestLoadAndSaveHistory(t *testing.T) {
 		loaded, err := LoadHistory(tmpDir, 3)
 		require.NoError(t, err)
 		assert.Equal(t, 2, loaded.Len())
-		assert.Equal(t, "img-1", loaded.entries[0].Name)
-		assert.Equal(t, "img-2", loaded.entries[1].Name)
+		assert.Equal(t, "img-1", loaded.Images[0].Name)
+		assert.Equal(t, "img-2", loaded.Images[1].Name)
 	})
 
 	t.Run("load with corrupted file returns error", func(t *testing.T) {

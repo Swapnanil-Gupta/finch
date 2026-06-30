@@ -27,7 +27,7 @@ type OSImageHistoryEntry struct {
 // Rollback pops from the last position.
 // The oldest entry is evicted from the first position when capacity is exceeded.
 type OSImageHistory struct {
-	entries  []*OSImageHistoryEntry
+	Images   []*OSImageHistoryEntry `json:"images"`
 	capacity int
 }
 
@@ -36,14 +36,14 @@ func NewHistory(capacity int) *OSImageHistory {
 }
 
 func (h *OSImageHistory) Len() int {
-	return len(h.entries)
+	return len(h.Images)
 }
 
 func (h *OSImageHistory) PeekLast() *OSImageHistoryEntry {
-	if len(h.entries) == 0 {
+	if len(h.Images) == 0 {
 		return nil
 	}
-	return h.entries[len(h.entries)-1]
+	return h.Images[len(h.Images)-1]
 }
 
 // If capacity is exceeded, entries are evicted from the front and returned.
@@ -54,38 +54,38 @@ func (h *OSImageHistory) PushLast(name, digest string) []*OSImageHistoryEntry {
 		return nil
 	}
 
-	h.entries = append(h.entries, &OSImageHistoryEntry{
+	h.Images = append(h.Images, &OSImageHistoryEntry{
 		Name:      name,
 		Digest:    digest,
 		AppliedAt: time.Now(),
 	})
 
-	if h.capacity > 0 && len(h.entries) > h.capacity {
-		excess := len(h.entries) - h.capacity
+	if h.capacity > 0 && len(h.Images) > h.capacity {
+		excess := len(h.Images) - h.capacity
 		evicted := make([]*OSImageHistoryEntry, excess)
-		copy(evicted, h.entries[:excess])
-		h.entries = h.entries[excess:]
+		copy(evicted, h.Images[:excess])
+		h.Images = h.Images[excess:]
 		return evicted
 	}
 	return nil
 }
 
 func (h *OSImageHistory) RemoveLast() *OSImageHistoryEntry {
-	if len(h.entries) == 0 {
+	if len(h.Images) == 0 {
 		return nil
 	}
-	popped := h.entries[len(h.entries)-1]
-	h.entries = h.entries[:len(h.entries)-1]
+	popped := h.Images[len(h.Images)-1]
+	h.Images = h.Images[:len(h.Images)-1]
 	return popped
 }
 
 // PeekSecondLast is used to peek at the rollback target.
 // The last entry is the currently used image.
 func (h *OSImageHistory) PeekSecondLast() *OSImageHistoryEntry {
-	if len(h.entries) <= 1 {
+	if len(h.Images) <= 1 {
 		return nil
 	}
-	return h.entries[len(h.entries)-2]
+	return h.Images[len(h.Images)-2]
 }
 
 func historyFilePath(finchDir string) string {
@@ -101,21 +101,14 @@ func LoadHistory(finchDir string, capacity int) (*OSImageHistory, error) {
 		}
 		return nil, fmt.Errorf("failed to read image history: %w", err)
 	}
-	var stored struct {
-		Images []*OSImageHistoryEntry `json:"images"`
-	}
-	if err := json.Unmarshal(data, &stored); err != nil {
+	if err := json.Unmarshal(data, h); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal image history: %w", err)
 	}
-	h.entries = stored.Images
 	return h, nil
 }
 
 func SaveHistory(finchDir string, h *OSImageHistory) error {
-	stored := struct {
-		Images []*OSImageHistoryEntry `json:"images"`
-	}{Images: h.entries}
-	data, err := json.MarshalIndent(stored, "", "  ")
+	data, err := json.MarshalIndent(h, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal image history: %w", err)
 	}

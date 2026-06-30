@@ -49,6 +49,14 @@ VERSION_INJECTION += -X $(PACKAGE)/pkg/dependency/credhelper.EcrVersion=$(ECR_CR
 VERSION_INJECTION += -X $(PACKAGE)/pkg/dependency/credhelper.EcrAMD64Hash=$(ECR_CRED_HELPER_AMD64_DIGEST)
 VERSION_INJECTION += -X $(PACKAGE)/pkg/dependency/credhelper.EcrARM64Hash=$(ECR_CRED_HELPER_ARM64_DIGEST)
 
+# OS image update URLs (overridable for staging e2e tests)
+ifdef FINCH_DEPS_MANIFEST_URL
+VERSION_INJECTION += -X $(PACKAGE)/pkg/osimage.depsManifestURL=$(FINCH_DEPS_MANIFEST_URL)
+endif
+ifdef FINCH_DEPS_MANIFEST_BUNDLE_URL
+VERSION_INJECTION += -X $(PACKAGE)/pkg/osimage.depsManifestBundleURL=$(FINCH_DEPS_MANIFEST_BUNDLE_URL)
+endif
+
 FINCH_DAEMON_LOCATION_ROOT ?= $(FINCH_OS_IMAGE_LOCATION_ROOT)/finch-daemon
 FINCH_DAEMON_LOCATION ?= $(FINCH_DAEMON_LOCATION_ROOT)/finch-daemon
 FINCH_DAEMON_CREDHELPER_LOCATION ?= $(FINCH_DAEMON_LOCATION_ROOT)/docker-credential-finch
@@ -355,7 +363,7 @@ create-report-dir:
 	mkdir -p $(REPORT_DIR)
 
 .PHONY: test-e2e
-test-e2e: test-e2e-vm-serial test-e2e-container
+test-e2e: test-e2e-vm-serial test-e2e-container test-e2e-osimage
 
 .PHONY: test-e2e-vm-serial
 test-e2e-vm-serial: create-report-dir create-coverage-dir add-credhelper-to-path
@@ -364,6 +372,15 @@ test-e2e-vm-serial: create-report-dir create-coverage-dir add-credhelper-to-path
 .PHONY: test-e2e-container
 test-e2e-container: create-report-dir create-coverage-dir add-credhelper-to-path
 	FINCH_GOCOVERDIR=$(COVERAGE_DIR) go test -coverpkg=./... -ldflags $(LDFLAGS) -timeout 2h ./e2e/container -test.v -test.gocoverdir=$(COVERAGE_DIR) -ginkgo.vv -ginkgo.timeout=2h -ginkgo.flake-attempts=3 -ginkgo.json-report=$(REPORT_DIR)/$(RUN_ID)-$(RUN_ATTEMPT)-e2e-container-report.json --installed="$(INSTALLED)"
+
+.PHONY: test-e2e-osimage
+test-e2e-osimage: create-report-dir create-coverage-dir
+	FINCH_GOCOVERDIR=$(COVERAGE_DIR) \
+	go test \
+		-coverpkg=./... -ldflags $(LDFLAGS) -timeout 10m ./e2e/osimage \
+		-test.v -test.gocoverdir=$(COVERAGE_DIR) \
+		-ginkgo.vv -ginkgo.timeout=10m -ginkgo.json-report=$(REPORT_DIR)/$(RUN_ID)-$(RUN_ATTEMPT)-e2e-osimage-report.json \
+		--installed="$(INSTALLED)"
 
 .PHONY: test-e2e-vm
 test-e2e-vm: create-report-dir create-coverage-dir

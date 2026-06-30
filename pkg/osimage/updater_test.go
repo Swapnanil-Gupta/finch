@@ -83,7 +83,15 @@ func TestCheckForUpdate(t *testing.T) {
 		require.NoError(t, os.WriteFile(filepath.Join(osDir, "finch.yaml"), []byte(yamlContent), 0o644))
 
 		fp := finchPath.Finch(tmpDir)
-		result, err := CheckForUpdate(logger, fp, server.URL+"/", noopManifestVerifier{})
+		result, err := CheckForUpdate(
+			logger, 
+			fp, 
+			DepsURLs{
+				ManifestURL: server.URL + "/" + manifestFileName, 
+				ManifestBundleURL: server.URL + "/" + manifestBundleFileName,
+			}, 
+			noopManifestVerifier{},
+		)
 		require.NoError(t, err)
 		assert.True(t, result.Available)
 		assert.Contains(t, result.NewImage, "99999999999")
@@ -120,7 +128,15 @@ func TestCheckForUpdate(t *testing.T) {
 		require.NoError(t, os.WriteFile(filepath.Join(osDir, "finch.yaml"), []byte(yamlContent), 0o644))
 
 		fp := finchPath.Finch(tmpDir)
-		result, err := CheckForUpdate(logger, fp, server.URL+"/", noopManifestVerifier{})
+		result, err := CheckForUpdate(
+			logger, 
+			fp, 
+			DepsURLs{
+				ManifestURL: server.URL + "/" + manifestFileName, 
+				ManifestBundleURL: server.URL + "/" + manifestBundleFileName,
+			}, 
+			noopManifestVerifier{},
+		)
 		require.NoError(t, err)
 		assert.False(t, result.Available)
 	})

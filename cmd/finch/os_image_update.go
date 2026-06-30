@@ -23,7 +23,7 @@ type osImageUpdateAction struct {
 	fp            path.Finch
 	fc            *config.Finch
 	finchRootPath string
-	baseURL       string
+	depsURLs      osimage.DepsURLs
 	verifier      osimage.ManifestVerifier
 	checkOnly     bool
 }
@@ -45,7 +45,7 @@ func newOSImageUpdateAction(logger flog.Logger, fp path.Finch, fc *config.Finch,
 		fp:            fp,
 		fc:            fc,
 		finchRootPath: finchRootPath,
-		baseURL:       osimage.FinchDepsURL,
+		depsURLs:      osimage.GetDefaultDepsURLs(),
 		verifier: osimage.NewCosignVerifier(
 			osimage.DefaultTrustedRootProvider{},
 			osimage.CosignIssuer,
@@ -61,7 +61,7 @@ func (a *osImageUpdateAction) runAdapter(_ *cobra.Command, _ []string) error {
 
 func (a *osImageUpdateAction) run() error {
 	finchDir := a.fp.FinchDir(a.finchRootPath)
-	result, err := osimage.CheckForUpdate(a.logger, a.fp, a.baseURL, a.verifier)
+	result, err := osimage.CheckForUpdate(a.logger, a.fp, a.depsURLs, a.verifier)
 	if err != nil {
 		return err
 	}
@@ -122,13 +122,15 @@ func (a *osImageUpdateAction) run() error {
 			}
 		}
 	} else {
-		// Backup is disabled so delete the old image.
+		// Backup is disabled so delete the old image and remove any stale history.
 		oldImagePath := filepath.Join(a.fp.OSImageDir(), result.CurrentImage)
 		if err := os.Remove(oldImagePath); err != nil {
 			a.logger.Warnf("Failed to removed old OS image %s: %v", result.CurrentImage, err)
 		} else {
 			a.logger.Infof("Removed old OS image: %s", result.CurrentImage)
 		}
+		historyPath := filepath.Join(finchDir, "os-image-history.json")
+		os.Remove(historyPath)
 	}
 
 	if err := osimage.ClearMetadata(finchDir); err != nil {

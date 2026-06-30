@@ -95,7 +95,10 @@ func TestOSImageUpdateAction_run(t *testing.T) {
 			fp:            fp,
 			fc:            fc,
 			finchRootPath: tmpDir,
-			baseURL:       serverURL,
+			depsURLs:      osimage.DepsURLs{
+				ManifestURL: serverURL + "manifest.json", 
+				ManifestBundleURL: serverURL + "manifest.json.bundle",
+			},
 			verifier:      noopVerifier{},
 			checkOnly:     true,
 		}
@@ -177,7 +180,10 @@ func TestOSImageUpdateAction_run(t *testing.T) {
 			fp:            fp,
 			fc:            fc,
 			finchRootPath: tmpDir,
-			baseURL:       serverURL,
+			depsURLs:      osimage.DepsURLs{
+				ManifestURL: serverURL + "manifest.json", 
+				ManifestBundleURL: serverURL + "manifest.json.bundle",
+			},
 			verifier:      noopVerifier{},
 			checkOnly:     false,
 		}
@@ -296,7 +302,10 @@ func TestOSImageUpdateAction_run(t *testing.T) {
 				fp:            fp,
 				fc:            fc,
 				finchRootPath: tmpDir,
-				baseURL:       serverURL,
+				depsURLs:      osimage.DepsURLs{
+					ManifestURL: serverURL + "manifest.json", 
+					ManifestBundleURL: serverURL + "manifest.json.bundle",
+				},
 				verifier:      noopVerifier{},
 				checkOnly:     false,
 			}
@@ -410,7 +419,10 @@ func TestOSImageUpdateAction_run(t *testing.T) {
 			fp:            fp,
 			fc:            fc,
 			finchRootPath: tmpDir,
-			baseURL:       serverURL,
+			depsURLs:      osimage.DepsURLs{
+				ManifestURL: serverURL + "manifest.json", 
+				ManifestBundleURL: serverURL + "manifest.json.bundle",
+			},
 			verifier:      noopVerifier{},
 			checkOnly:     false,
 		}
@@ -491,7 +503,10 @@ func TestOSImageUpdateAction_run(t *testing.T) {
 			fp:            fp,
 			fc:            fc,
 			finchRootPath: tmpDir,
-			baseURL:       serverURL,
+			depsURLs:      osimage.DepsURLs{
+				ManifestURL: serverURL + "manifest.json", 
+				ManifestBundleURL: serverURL + "manifest.json.bundle",
+			},
 			verifier:      noopVerifier{},
 			checkOnly:     false,
 		}
@@ -580,7 +595,10 @@ func TestOSImageUpdateAction_run(t *testing.T) {
 			fp:            fp,
 			fc:            fc,
 			finchRootPath: tmpDir,
-			baseURL:       serverURL,
+			depsURLs:      osimage.DepsURLs{
+				ManifestURL: serverURL + "manifest.json", 
+				ManifestBundleURL: serverURL + "manifest.json.bundle",
+			},
 			verifier:      noopVerifier{},
 			checkOnly:     false,
 		}

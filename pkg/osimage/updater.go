@@ -56,14 +56,33 @@ type CheckUpdateResult struct {
 }
 
 const (
-	manifestFileName = "manifest.json"
-	// manifestSignatureFileName    = "manifest.json.sig"
+	manifestFileName       = "manifest.json"
 	manifestBundleFileName = "manifest.json.bundle"
-	FinchDepsURL           = "https://deps.runfinch.com/"
+	// manifestSignatureFileName    = "manifest.json.sig"
 )
 
-func CheckForUpdate(logger flog.Logger, fp finchPath.Finch, finchDepsURL string, verifier ManifestVerifier) (*CheckUpdateResult, error) {
-	manifest, err := fetchManifest(logger, finchDepsURL, verifier)
+// DepsURLs holds the URLs for downloading OS image manifest and signature.
+// The artifact URLs are part of the manifest.
+type DepsURLs struct {
+	ManifestURL       string
+	ManifestBundleURL string
+}
+
+// Overridable via ldflags at build time for staging/testing.
+var (
+	depsManifestURL       = "https://deps.runfinch.com/" + manifestFileName
+	depsManifestBundleURL = "https://deps.runfinch.com/" + manifestBundleFileName
+)
+
+func GetDefaultDepsURLs() DepsURLs {
+	return DepsURLs{
+		ManifestURL:       depsManifestURL,
+		ManifestBundleURL: depsManifestBundleURL,
+	}
+}
+
+func CheckForUpdate(logger flog.Logger, fp finchPath.Finch, urls DepsURLs, verifier ManifestVerifier) (*CheckUpdateResult, error) {
+	manifest, err := fetchManifest(logger, urls, verifier)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch manifest: %w", err)
 	}
@@ -131,10 +150,10 @@ func Update(logger flog.Logger, fp finchPath.Finch, result *CheckUpdateResult) e
 	return nil
 }
 
-func fetchManifest(logger flog.Logger, finchDepsURL string, verifier ManifestVerifier) (*Manifest, error) {
+func fetchManifest(logger flog.Logger, urls DepsURLs, verifier ManifestVerifier) (*Manifest, error) {
 	logger.Info("Fetching manifest...")
 	var manifestBuf bytes.Buffer
-	if err := download(getManifestDownloadUrl(finchDepsURL), &manifestBuf); err != nil {
+	if err := download(urls.ManifestURL, &manifestBuf); err != nil {
 		return nil, fmt.Errorf("failed to download manifest: %w", err)
 	}
 	manifestBytes := manifestBuf.Bytes()
@@ -147,7 +166,7 @@ func fetchManifest(logger flog.Logger, finchDepsURL string, verifier ManifestVer
 
 	logger.Info("Validating manifest...")
 	var manifestBundleBuf bytes.Buffer
-	if err := download(getManifestBundleDownloadUrl(finchDepsURL), &manifestBundleBuf); err != nil {
+	if err := download(urls.ManifestBundleURL, &manifestBundleBuf); err != nil {
 		return nil, fmt.Errorf("failed to download manifest bundle: %w", err)
 	}
 	manifestBundleBytes := manifestBundleBuf.Bytes()
@@ -212,12 +231,4 @@ func readBaseFinchYaml(fp finchPath.Finch) (*FinchYAML, error) {
 		return nil, fmt.Errorf("failed to unmarshal finch.yaml: %w", err)
 	}
 	return &finchYAML, nil
-}
-
-func getManifestDownloadUrl(baseURL string) string {
-	return baseURL + manifestFileName
-}
-
-func getManifestBundleDownloadUrl(baseURL string) string {
-	return baseURL + manifestBundleFileName
 }
