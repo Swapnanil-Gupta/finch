@@ -41,7 +41,7 @@ jobs:
         # e2e suite can redirect the updater at its local test server (see the osimage package).
         run: |
           export PATH="/opt/homebrew/opt/libtool/libexec/gnubin:$PATH"
-          make
+          make FINCH_OSIMAGE_ALLOW_ENV_OVERRIDES=true
         shell: zsh {0}
       - name: Run os-image e2e tests
         run: make test-e2e-osimage
