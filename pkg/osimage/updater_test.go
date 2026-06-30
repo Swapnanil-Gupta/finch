@@ -84,12 +84,12 @@ func TestCheckForUpdate(t *testing.T) {
 
 		fp := finchPath.Finch(tmpDir)
 		result, err := CheckForUpdate(
-			logger, 
-			fp, 
+			logger,
+			fp,
 			DepsURLs{
-				ManifestURL: server.URL + "/" + manifestFileName, 
+				ManifestURL:       server.URL + "/" + manifestFileName,
 				ManifestBundleURL: server.URL + "/" + manifestBundleFileName,
-			}, 
+			},
 			noopManifestVerifier{},
 		)
 		require.NoError(t, err)
@@ -129,12 +129,12 @@ func TestCheckForUpdate(t *testing.T) {
 
 		fp := finchPath.Finch(tmpDir)
 		result, err := CheckForUpdate(
-			logger, 
-			fp, 
+			logger,
+			fp,
 			DepsURLs{
-				ManifestURL: server.URL + "/" + manifestFileName, 
+				ManifestURL:       server.URL + "/" + manifestFileName,
 				ManifestBundleURL: server.URL + "/" + manifestBundleFileName,
-			}, 
+			},
 			noopManifestVerifier{},
 		)
 		require.NoError(t, err)

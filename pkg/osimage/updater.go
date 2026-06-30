@@ -68,16 +68,41 @@ type DepsURLs struct {
 	ManifestBundleURL string
 }
 
-// Overridable via ldflags at build time for staging/testing.
-var (
-	depsManifestURL       = "https://deps.runfinch.com/" + manifestFileName
-	depsManifestBundleURL = "https://deps.runfinch.com/" + manifestBundleFileName
+// Environment variables honored only when env overrides are enabled (see allowEnvOverrides).
+// They let the os-image e2e tests redirect the updater at a local test server and match the
+// keyless signing identity used to sign the test manifest.
+const (
+	EnvDepsURL        = "FINCH_DEPS_URL"
+	EnvCosignIssuer   = "FINCH_DEPS_COSIGN_ISSUER"
+	EnvCosignIdentity = "FINCH_DEPS_COSIGN_IDENTITY"
 )
 
-func GetDefaultDepsURLs() DepsURLs {
+// allowEnvOverrides gates whether the FINCH_DEPS_* environment variables are honored.
+// It defaults to "false" and is flipped to "true" only for e2e builds via ldflags
+// (see the test-e2e-osimage target in the Makefile). Because the value is baked in at
+// compile time, a shipped production binary cannot be redirected to an arbitrary,
+// differently-signed manifest source through the environment.
+var allowEnvOverrides = "false"
+
+// depsBaseURL is the base URL the manifest and bundle are downloaded from.
+// Overridable via ldflags at build time for staging.
+var depsBaseURL = "https://deps.runfinch.com"
+
+func envOverridesAllowed() bool {
+	return allowEnvOverrides == "true"
+}
+
+func GetDepsURLs() DepsURLs {
+	base := depsBaseURL
+	if envOverridesAllowed() {
+		if v := os.Getenv(EnvDepsURL); v != "" {
+			base = v
+		}
+	}
+	base = strings.TrimSuffix(base, "/")
 	return DepsURLs{
-		ManifestURL:       depsManifestURL,
-		ManifestBundleURL: depsManifestBundleURL,
+		ManifestURL:       base + "/" + manifestFileName,
+		ManifestBundleURL: base + "/" + manifestBundleFileName,
 	}
 }
 

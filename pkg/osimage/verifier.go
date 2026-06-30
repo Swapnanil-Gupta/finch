@@ -11,6 +11,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -26,6 +27,29 @@ const (
 	// TODO: change this to actual values from runfinch/finch-core
 	CosignIdentity = "https://github.com/Swapnanil-Gupta/finch-core/.github/workflows/test-keyless-signing.yaml@refs/heads/main"
 )
+
+// GetCosignIssuer returns the trusted keyless signing issuer. When env overrides are
+// enabled (e2e builds only), FINCH_DEPS_COSIGN_ISSUER takes precedence so the verifier
+// can match the identity that signed the locally generated test manifest.
+func GetCosignIssuer() string {
+	if envOverridesAllowed() {
+		if v := os.Getenv(EnvCosignIssuer); v != "" {
+			return v
+		}
+	}
+	return CosignIssuer
+}
+
+// GetCosignIdentity returns the trusted keyless signing identity. When env overrides are
+// enabled (e2e builds only), FINCH_DEPS_COSIGN_IDENTITY takes precedence.
+func GetCosignIdentity() string {
+	if envOverridesAllowed() {
+		if v := os.Getenv(EnvCosignIdentity); v != "" {
+			return v
+		}
+	}
+	return CosignIdentity
+}
 
 // ManifestVerifier verifies the integrity and authenticity of a manifest.
 type ManifestVerifier interface {
